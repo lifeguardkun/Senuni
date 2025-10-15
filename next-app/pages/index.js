@@ -1,10 +1,14 @@
-import { useState, useRef} from 'react';
+import { useState, useRef, useEffect} from 'react';
 import Script from 'next/script'
 
 function Home (){
 
   // GmailAPI, OAuth instance
   const OAuthClientRef = useRef(null);
+
+  // library's state
+  const [gapiReady, setGapiReady] = useState(false);
+  const [gisReady, setGisReady] = useState(false);
 
 
   const [IncampusMessages, setIncampusMessages] = useState([]);
@@ -26,6 +30,7 @@ function Home (){
       apiKey: GMAIL_API_KEY,
       discoveryDocs: [DISCOVERY_DOC],
     });
+    setGapiReady(true);
   }
 
 
@@ -45,6 +50,7 @@ function Home (){
         fetchMessages();
       }
     });
+    setGisReady(true);
   }
 
   // call OAuth after clicked button
@@ -53,6 +59,13 @@ function Home (){
       OAuthClientRef.current.requestAccessToken({ prompt: 'consent' });
     }
   }
+
+  // silent OAuth
+  useEffect(() => {
+    if (gapiReady && gisReady) {
+      OAuthClientRef.current.requestAccessToken({ prompt: '' });
+    }
+  }, [gapiReady, gisReady]);
 
 
   // fetch Gmail's content after OAuth
