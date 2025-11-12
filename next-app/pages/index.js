@@ -1,142 +1,45 @@
-import { useState, useRef, useEffect} from 'react';
-import Script from 'next/script'
+import { useState, useEffect } from 'react';
+import Script from 'next/script';
+import { initOAuthClient, signIn, silentSignIn } from '../lib/OAuth';
+import { initGapiClient, fetchIncampusMessages, fetchClassroomMessages } from '../lib/GmailAPI';
 
-function Home (){
-
-  // GmailAPI, OAuth instance
-  const OAuthClientRef = useRef(null);
-
-  // library's state
+function Home() {
   const [gapiReady, setGapiReady] = useState(false);
   const [gisReady, setGisReady] = useState(false);
-
 
   const [IncampusMessages, setIncampusMessages] = useState([]);
   const [ClassroomMessages, setClassroomMessages] = useState([]);
 
-  // --------------- GmailAPI -------------- //
-  // activate GmailAPI
-  const GMAIL_API_KEY = process.env.NEXT_PUBLIC_GMAIL_API_KEY;
-  const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest'; 
+  const fetchMessages = async () => {
+    const incampusData = await fetchIncampusMessages();
+    setIncampusMessages(incampusData);
 
-  //initialize
-  const LoadGapi = () => {
-    gapi.load('client', initializeGapiClient);
-  }
+    const classroomData = await fetchClassroomMessages();
+    setClassroomMessages(classroomData);
+  };
 
-  // LoadGapi's callback
-  const initializeGapiClient = () => {
-    gapi.client.init({
-      apiKey: GMAIL_API_KEY,
-      discoveryDocs: [DISCOVERY_DOC],
-    });
+  const LoadGmailAPI = async () => {
+    await initGapiClient();
     setGapiReady(true);
-  }
+  };
 
-
-  //--------------- OAuth --------------- //
-  // activate OAuth
-  const OAUTH_CLIENT_ID = process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID;
-  const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
-
-  // initialize
-  const LoadGsi = () => {
-    OAuthClientRef.current = google.accounts.oauth2.initTokenClient({
-      client_id: OAUTH_CLIENT_ID,
-      scope: SCOPES,
-      // 認証完了時のコールバック
-      callback: () => {
-        console.log('認証完了')
-        fetchMessages();
-      }
-    });
+  const LoadOAuth = () => {
+    initOAuthClient(fetchMessages);
     setGisReady(true);
-  }
+  };
 
-  // call OAuth after clicked button
-  const hadleOAuthClick = () => {
-    if (OAuthClientRef.current){
-      OAuthClientRef.current.requestAccessToken({ prompt: 'consent' });
-    }
-  }
-
-  // silent OAuth
   useEffect(() => {
     if (gapiReady && gisReady) {
-      OAuthClientRef.current.requestAccessToken({ prompt: '' });
+      silentSignIn();
     }
   }, [gapiReady, gisReady]);
 
-
-  // fetch Gmail's content after OAuth
-  const fetchMessages= async () => {
-
-    //----- fetch in Campus messages ----//
-    // メールのメタ情報(idなど)を取得
-    const incampus_fetchMetamessages = await gapi.client.gmail.users.messages.list({
-      'userId': 'me',
-      q: 'from:no-reply-incampus@isc.senshu-u.ac.jp',
-      'maxResults': 15
-    });
-    const incampus_metamessages = incampus_fetchMetamessages.result.messages;
-
-    //メタ情報からメッセージを取得
-    const incampus_fetchMessages = incampus_metamessages.map((metamessage) =>
-      gapi.client.gmail.users.messages.get({
-        'userId': 'me',
-        'id': metamessage.id
-      })
-    );
-    const incampus_messages = await Promise.all(incampus_fetchMessages);
-
-    //　情報の抽出・整形
-    const incampus_FilteredMessages = incampus_messages.map(message => {
-      return{
-        snippet: message.result.snippet
-      }
-    })
-    
-    setIncampusMessages(incampus_FilteredMessages);
-
-    //----- fetch Google Classroom messages ----//
-    // メールのメタ情報(idなど)を取得
-    const classroom_fetchMetamessages = await gapi.client.gmail.users.messages.list({
-      'userId': 'me',
-      q: 'from:<no-reply@classroom.google.com>',
-      'maxResults': 15
-    });
-    const classroom_metamessages = classroom_fetchMetamessages.result.messages;
-
-    //メタ情報からメッセージを取得
-    const classroom_fetchMessages = classroom_metamessages.map((metamessage) =>
-      gapi.client.gmail.users.messages.get({
-        'userId': 'me',
-        'id': metamessage.id
-      })
-    );
-    const classroom_messages = await Promise.all(classroom_fetchMessages);
-
-    //　情報の抽出・整形
-    const classroom_FilteredMessages = classroom_messages.map(message => {
-      return{
-        snippet: message.result.snippet
-      }
-    })
-    
-    setClassroomMessages(classroom_FilteredMessages);
-
-  }
-
-
-  return(
+  return (
     <>
+      <Script src="https://apis.google.com/js/api.js" onLoad={LoadGmailAPI} />
+      <Script async defer src="https://accounts.google.com/gsi/client" onLoad={LoadOAuth}></Script>
 
-      <Script src="https://apis.google.com/js/api.js" onLoad={LoadGapi} />
-      <Script async defer src="https://accounts.google.com/gsi/client" onLoad={LoadGsi}></Script>
-      
-      
-
-      <button onClick = {hadleOAuthClick}>
+      <button onClick={signIn}>
         Authentication
       </button>
 
@@ -144,8 +47,8 @@ function Home (){
         <>
           <h2>in Campus Messages</h2>
           <ul>
-            {IncampusMessages.map(message => (
-              <li>
+            {IncampusMessages.map((message, index) => (
+              <li key={`incampus-${index}`}>
                 {message.snippet}
               </li>
             ))}
@@ -157,17 +60,16 @@ function Home (){
         <>
           <h2> Google Classroom Messages</h2>
           <ul>
-            {ClassroomMessages.map(message => (
-              <li>
+            {ClassroomMessages.map((message, index) => (
+              <li key={`classroom-${index}`}>
                 {message.snippet}
               </li>
             ))}
           </ul>
         </>
       ) : null}
-
     </>
-  )
+  );
 }
 
 export default Home;
