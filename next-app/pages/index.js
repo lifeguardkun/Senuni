@@ -1,73 +1,56 @@
-import { useState, useEffect } from 'react';
 import Script from 'next/script';
-import { initOAuthClient, signIn, silentSignIn } from '../lib/OAuth';
-import { initGapiClient, fetchIncampusMessages, fetchClassroomMessages } from '../lib/GmailAPI';
+import { signInWithGoogle, signOut } from '../lib/Auth';
+import { CategoryManager } from '../components/CategoryManager';
+import { StockList } from '../components/StockList';      // 追加
+import { CategoryTree } from '../components/CategoryTree'; // 追加
+
+import { ManageAuth } from '../hooks/ManageAuth';
+import { MessageSync } from '../hooks/MessageSync';
+import { useCategories } from '../hooks/CategoryController';
 
 function Home() {
-  const [gapiReady, setGapiReady] = useState(false);
-  const [gisReady, setGisReady] = useState(false);
-
-  const [IncampusMessages, setIncampusMessages] = useState([]);
-  const [ClassroomMessages, setClassroomMessages] = useState([]);
-
-  const fetchMessages = async () => {
-    const incampusData = await fetchIncampusMessages();
-    setIncampusMessages(incampusData);
-
-    const classroomData = await fetchClassroomMessages();
-    setClassroomMessages(classroomData);
-  };
-
-  const LoadGmailAPI = async () => {
-    await initGapiClient();
-    setGapiReady(true);
-  };
-
-  const LoadOAuth = () => {
-    initOAuthClient(fetchMessages);
-    setGisReady(true);
-  };
-
-  useEffect(() => {
-    if (gapiReady && gisReady) {
-      silentSignIn();
-    }
-  }, [gapiReady, gisReady]);
+  const { session, isReady, loadGapi } = ManageAuth();
+  const { categories, addCategory } = useCategories(session);
+  
+  // assignCategory と categorizedMessages を受け取る
+  const { stockMessages, categorizedMessages, assignCategory } = MessageSync(isReady);
 
   return (
     <>
-      <Script src="https://apis.google.com/js/api.js" onLoad={LoadGmailAPI} />
-      <Script async defer src="https://accounts.google.com/gsi/client" onLoad={LoadOAuth}></Script>
+      <Script src="https://apis.google.com/js/api.js" onLoad={loadGapi} />
 
-      <button onClick={signIn}>
-        Authentication
-      </button>
+      {!session ? (
+        <button onClick={signInWithGoogle}>Authentication</button>
+      ) : (
+          <button onClick={signOut}>
+            Log out
+          </button>
+      )}
 
-      {IncampusMessages.length > 0 ? (
-        <>
-          <h2>in Campus Messages</h2>
-          <ul>
-            {IncampusMessages.map((message, index) => (
-              <li key={`incampus-${index}`}>
-                {message.snippet}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+      {session && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          
+          {/* 左カラム: インボックスと操作 */}
+          <div>
 
-      {ClassroomMessages.length > 0 ? (
-        <>
-          <h2> Google Classroom Messages</h2>
-          <ul>
-            {ClassroomMessages.map((message, index) => (
-              <li key={`classroom-${index}`}>
-                {message.snippet}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+            <StockList 
+              messages={stockMessages} 
+              categories={categories}
+              onAssign={assignCategory} 
+              onAddCategory={addCategory} // ★ここが重要
+            />
+          </div>
+
+          {/* 右カラム: 階層化されたアーカイブ */}
+          <div>
+            <CategoryTree 
+              categories={categories} 
+              messages={categorizedMessages} 
+            />
+          </div>
+          
+        </div>
+      )}
     </>
   );
 }

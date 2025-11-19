@@ -17,27 +17,44 @@ export const initGapiClient = async () => {
 };
 
 const getMessages = async (query) => {
-  const metaMessagesResponse = await gapi.client.gmail.users.messages.list({
+  const metaDataResponse = await gapi.client.gmail.users.messages.list({
     'userId': 'me',
     'q': query,
     'maxResults': 15
   });
 
-  const metamessages = metaMessagesResponse.result.messages || [];
+  const metaData = metaDataResponse.result.messages || [];
 
-  const messagePromises = metamessages.map((metamessage) =>
+  const messageRequest = metaData.map((metadata) =>
     gapi.client.gmail.users.messages.get({
       'userId': 'me',
-      'id': metamessage.id
+      'id': metadata.id
     })
   );
 
-  const messages = await Promise.all(messagePromises);
+  const messagesResponse = await Promise.all(messageRequest);
 
-  const filteredMessages = messages.map(message => ({
-    snippet: message.result.snippet
-  }));
+  const filteredMessages = messagesResponse.map(message => {
+    const result = message.result;
+    const headers = result.payload.headers; // ヘッダー情報の配列
 
+    // ヘッダー配列から特定の名前(Key)の値を探すヘルパー関数
+    const getHeaderValue = (name) => {
+      const header = headers.find(h => h.name === name);
+      return header ? header.value : '';
+    };
+
+    return {
+      // DBのカラム名 : GmailAPIの値
+      gmail_id: result.id,
+      snippet: result.snippet,
+      subject: getHeaderValue('Subject'), // 件名を取得
+      sender: getHeaderValue('From'),     // 送信者を取得
+      // internalDateはミリ秒なので、Postgresが読めるISO形式の日付文字列に変換
+      received_at: new Date(parseInt(result.internalDate)).toISOString(), 
+    };
+  });
+  
   return filteredMessages;
 };
 
