@@ -19,15 +19,19 @@ export default async function Home() {
 
   // ログイン済み
   return (
-    <main className="flex h-screen">
-      <Logout />
+    <>
+      <header>
+        <Logout/>
+      </header>
 
-      <div className="w-1/2 border-r p-4 overflow-auto">
-        <Inbox />
-      </div>
-      <div className="w-1/2 p-4 overflow-auto bg-gray-50">
-        <Archive />
-      </div>
-    </main>
+      <main className="flex h-screen">
+        <div className="w-1/2 border-r p-4 overflow-auto">
+          <Inbox />
+        </div>
+        <div className="w-1/2 p-4 overflow-auto bg-gray-50">
+          <Archive />
+        </div>
+      </main>
+    </>
   );
 }

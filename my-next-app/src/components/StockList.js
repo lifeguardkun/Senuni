@@ -25,13 +25,13 @@ export default function StockList({ initialMessages }) {
 
   const handleArchive = () => {
     if (!selectedMsg) return;
-    const { id, sender } = selectedMsg;
+    const { id, sender, subject, snippet } = selectedMsg;
 
     setSelectedMsg(null);
 
     startTransition(async () => {
       removeOptimisticMessage(id);
-      await autoCategorize(id, sender);
+      await autoCategorize(id, sender, subject, snippet);
     });
   };
 
