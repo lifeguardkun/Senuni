@@ -20,9 +20,8 @@ export default async function Home() {
   // ログイン済み
   return (
     <main className="flex h-screen">
-      <Logout />
-
       <div className="w-1/2 border-r p-4 overflow-auto">
+        <Logout />
         <Inbox />
       </div>
       <div className="w-1/2 p-4 overflow-auto bg-gray-50">
